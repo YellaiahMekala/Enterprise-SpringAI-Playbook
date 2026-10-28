@@ -1,0 +1,35 @@
+# Local stack: MySQL + the app. Secrets come from a git-ignored .env file (copy .env.example).
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: spring_ai_dev
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/spring_ai_dev?useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in .env}
+      APP_API_KEY: ${APP_API_KEY:?set APP_API_KEY in .env}
+      NEWS_API_KEY: ${NEWS_API_KEY:-}
+    volumes:
+      - generated-images:/app/generated
+
+volumes:
+  mysql-data:
+  generated-images:
