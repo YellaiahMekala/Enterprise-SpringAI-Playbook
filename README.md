@@ -116,11 +116,17 @@ sequenceDiagram
 ```
 The caller id is derived from the credential, so one caller cannot read another's conversation. It scopes storage and is never sent to the model.
 
+### Concurrent conversation requests
+
+Chat, tutor, assistant and day-planner requests share the caller's memory. Within one application instance, only one stateful turn per caller may run at a time. An overlapping request receives HTTP 409 with `application/problem+json` and the detail `A conversation request is already in progress. Retry after it completes.` It does not enter the memory advisor or call the model. Wait for the in-flight turn to complete before retrying; there is no server-side waiting queue or automatic retry. Different callers and stateless movie recommendations can proceed concurrently. The guard is released even when a provider call fails.
+
+**Deployment scope:** this guard is local to the singleton service in one JVM. Shared JDBC memory does not provide a distributed conversation lock. Multiple replicas need a shared coordination mechanism or routing that ensures all stateful requests for a caller reach the same instance. This change does not roll back user messages persisted by the existing advisor when a provider fails.
+
 ### Tool calling
 The assistant client is built with the date/time, weather and news tools. Spring AI derives each tool's JSON schema from `@Tool`/`@ToolParam`, the model requests a call, Spring AI executes it and feeds the result back until the model produces a final answer. Tools return failures as short text instead of throwing, so the model can recover and the request does not fail.
 
 ### Errors
-Every failure is `application/problem+json`: validation and malformed input → 400, missing/invalid key → 401, unsupported upload → 415, provider rate limit → 429, provider rejection or empty answer → 502, provider timeout → 504, anything else → generic 500. Provider messages, hosts and credentials are logged, never returned.
+Every failure is `application/problem+json`: validation and malformed input → 400, missing/invalid key → 401, overlapping conversation request → 409, unsupported upload → 415, provider rate limit → 429, provider rejection or empty answer → 502, provider timeout → 504, anything else → generic 500. Provider messages, hosts and credentials are logged, never returned.
 
 ---
 
@@ -235,7 +241,7 @@ PowerShell: `$env:OPENAI_API_KEY="sk-..."`. The app listens on `http://localhost
 ./mvnw verify
 ```
 
-36 tests, no network and no API key required:
+44 tests, no external network and no API key required (concurrency integration tests use a local HTTP server):
 
 | Kind | What it proves |
 |---|---|
@@ -245,6 +251,7 @@ PowerShell: `$env:OPENAI_API_KEY="sk-..."`. The app listens on `http://localhost
 | Advisor | Tutor instruction appended; roles and history preserved |
 | Tools (MockRestServiceServer) | URL encoding, key only in header, input rejection, graceful degradation |
 | Persistence (Testcontainers MySQL 8.4) | Memory round-trip on a real database; skipped automatically when Docker is unavailable |
+| Concurrent turns (real HTTP, security, service, memory advisor and H2; controlled fake model) | All four stateful use cases reject overlapping turns before memory/model access; retries preserve turn order; independent callers and stateless requests proceed; provider errors release the guard |
 
 CI (`.github/workflows/ci.yml`) runs `mvn verify` (including the MySQL test) and builds the Docker image.
 
