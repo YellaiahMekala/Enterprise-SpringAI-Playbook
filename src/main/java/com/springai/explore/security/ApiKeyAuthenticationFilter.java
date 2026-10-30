@@ -42,7 +42,12 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             if (key == null || key.isBlank()) {
                 throw new IllegalStateException("API key for caller '" + caller + "' is empty: set APP_API_KEY.");
             }
-            digestsByCaller.put(caller, sha256(key));
+            byte[] digest = sha256(key);
+            if (digestsByCaller.values().stream().anyMatch(existing -> MessageDigest.isEqual(existing, digest))) {
+                throw new IllegalStateException("API key for caller '" + caller
+                        + "' is already assigned to another caller. Configure a unique key for each caller.");
+            }
+            digestsByCaller.put(caller, digest);
         });
     }
 
