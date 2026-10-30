@@ -12,15 +12,20 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import static com.springai.explore.config.AiConfig.PLAIN_CLIENT;
@@ -38,7 +43,8 @@ public class ImageService {
         this.outputDir = Path.of(props.image().outputDir()).toAbsolutePath().normalize();
     }
 
-    public ImageResult generate(String prompt) {
+    public ImageResult generate(String callerId, String prompt) {
+        Path directory = callerDirectory(callerId);
         ImageResponse response = imageModel.call(new ImagePrompt(prompt,
                 OpenAiImageOptions.builder().quality("high").width(1024).height(1024).build()));
 
@@ -55,20 +61,31 @@ public class ImageService {
         // The server picks the file name: no client-controlled path ever reaches the file system.
         UUID id = UUID.randomUUID();
         try {
-            Files.createDirectories(outputDir);
-            Files.write(outputDir.resolve(id + ".png"), Base64.getDecoder().decode(base64));
+            Files.createDirectories(directory);
+            Files.write(directory.resolve(id + ".png"), Base64.getDecoder().decode(base64));
         } catch (IOException e) {
             throw new UncheckedIOException("Could not store the generated image", e);
         }
         return new ImageResult(id, totalTokens);
     }
 
-    public Resource load(UUID id) {
-        Path file = outputDir.resolve(id + ".png");
+    public Resource load(String callerId, UUID id) {
+        Path file = callerDirectory(callerId).resolve(id + ".png");
         if (!Files.isRegularFile(file)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image not found.");
         }
         return new FileSystemResource(file);
+    }
+
+    /** Stable ownership on disk; caller ids never become raw path components. No legacy-root fallback. */
+    private Path callerDirectory(String callerId) {
+        Assert.hasText(callerId, "An authenticated caller id is required.");
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(callerId.getBytes(StandardCharsets.UTF_8));
+            return outputDir.resolve("caller-" + HexFormat.of().formatHex(digest));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable.", e);
+        }
     }
 
     public String describe(String prompt, MultipartFile file) {

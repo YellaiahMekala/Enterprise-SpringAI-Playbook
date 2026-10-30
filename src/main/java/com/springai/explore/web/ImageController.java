@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.util.UUID;
 
 @RestController
@@ -33,13 +34,13 @@ public class ImageController {
     }
 
     @PostMapping
-    public ImageResult generate(@Valid @RequestBody PromptRequest request) {
-        return imageService.generate(request.prompt());
+    public ImageResult generate(@Valid @RequestBody PromptRequest request, Principal caller) {
+        return imageService.generate(caller.getName(), request.prompt());
     }
 
     @GetMapping(value = "/{id}", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<Resource> download(@PathVariable UUID id) {
-        return ResponseEntity.ok(imageService.load(id));
+    public ResponseEntity<Resource> download(@PathVariable UUID id, Principal caller) {
+        return ResponseEntity.ok(imageService.load(caller.getName(), id));
     }
 
     @PostMapping(value = "/descriptions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
