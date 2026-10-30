@@ -219,7 +219,7 @@ PowerShell: `$env:OPENAI_API_KEY="sk-..."`. The app listens on `http://localhost
 | Variable / property | Default | Purpose |
 |---|---|---|
 | `OPENAI_API_KEY` | required | Provider credential |
-| `APP_API_KEY` | required | Key for caller `demo-user` (`app.security.api-keys.<caller-id>`, caller id max 36 chars) |
+| `APP_API_KEY` | required | Key for caller `demo-user` (`app.security.api-keys.<caller-id>`, caller id max 36 chars). Each caller must have a unique key; duplicate keys fail startup. |
 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | localhost MySQL, `root`, required | Chat-memory database |
 | `NEWS_API_KEY` | empty | Enables `NewsTool`; without it the tool reports "not configured" |
 | `CHAT_MEMORY_INIT_SCHEMA` | `always` | Use `never` and a migration tool in production |
@@ -235,11 +235,11 @@ PowerShell: `$env:OPENAI_API_KEY="sk-..."`. The app listens on `http://localhost
 ./mvnw verify
 ```
 
-36 tests, no network and no API key required:
+39 tests, no network and no API key required:
 
 | Kind | What it proves |
 |---|---|
-| Security filter | Digest-based key match, startup fail-fast on missing/blank/oversized ids |
+| Security filter | Digest-based key match for each caller, startup fail-fast on missing/blank/oversized ids and duplicate keys (in either caller order), duplicate-key errors do not reveal credentials |
 | Web (MockMvc, full filter chain) | 401 contract, public health only, validation 400s, upload 400/415, UUID path checks, 502 mapping, no internal leak on 500 |
 | Chat service with the real `ChatClient` and memory advisor against a fake model | History replay per caller, isolation between callers, empty-response handling |
 | Advisor | Tutor instruction appended; roles and history preserved |
