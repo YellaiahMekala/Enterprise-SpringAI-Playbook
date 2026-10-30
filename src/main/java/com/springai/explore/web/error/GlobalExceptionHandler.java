@@ -2,6 +2,7 @@ package com.springai.explore.web.error;
 
 import com.openai.errors.OpenAIIoException;
 import com.openai.errors.OpenAIServiceException;
+import com.springai.explore.service.ConversationBusyException;
 import com.springai.explore.service.ModelResponseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(ConversationBusyException.class)
+    ProblemDetail handleConversationBusy(ConversationBusyException e) {
+        return problem(HttpStatus.CONFLICT, e.getMessage());
+    }
 
     @ExceptionHandler(OpenAIServiceException.class)
     ProblemDetail handleProviderError(OpenAIServiceException e) {
