@@ -3,12 +3,15 @@ package com.springai.explore.security;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,18 +35,35 @@ class ApiKeyAuthenticationFilterTests {
         filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
     }
 
-    @Test
-    void validKeyAuthenticatesTheMatchingCaller() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"alice", "bob"})
+    void validKeyAuthenticatesTheMatchingCaller(String caller) throws Exception {
         var captured = new String[1];
         var request = new MockHttpServletRequest();
-        request.addHeader(ApiKeyAuthenticationFilter.HEADER, "key-bob");
+        request.addHeader(ApiKeyAuthenticationFilter.HEADER, "key-" + caller);
         filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain() {
             @Override
             public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse res) {
                 captured[0] = SecurityContextHolder.getContext().getAuthentication().getName();
             }
         });
-        assertThat(captured[0]).isEqualTo("bob");
+        assertThat(captured[0]).isEqualTo(caller);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"alice", "bob"})
+    void startupRejectsDuplicateKeysRegardlessOfCallerOrderWithoutLeakingTheKey(String firstCaller) {
+        String secondCaller = firstCaller.equals("alice") ? "bob" : "alice";
+        String sharedKey = "shared-secret-must-not-appear";
+        var keys = new LinkedHashMap<String, String>();
+        keys.put(firstCaller, sharedKey);
+        keys.put(secondCaller, sharedKey);
+
+        assertThatThrownBy(() -> new ApiKeyAuthenticationFilter(keys))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(secondCaller)
+                .hasMessageContaining("unique")
+                .hasMessageNotContaining(sharedKey);
     }
 
     @Test
