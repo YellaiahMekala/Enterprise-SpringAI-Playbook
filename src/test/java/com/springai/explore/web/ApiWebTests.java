@@ -157,7 +157,9 @@ class ApiWebTests {
         mvc.perform(post("/api/v1/chat").header("X-API-Key", KEY)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"prompt\":\"hi\"}"))
                 .andExpect(status().isBadGateway())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(502))
+                .andExpect(jsonPath("$.detail").value("The model returned an empty response."));
     }
 
     @Test
