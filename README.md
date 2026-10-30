@@ -175,8 +175,8 @@ All `/api/**` endpoints require the header `X-API-Key: <key>`. Request bodies ar
 | POST | `/api/v1/assistant/ask` | same | same, tools enabled |
 | POST | `/api/v1/assistant/plan-my-day` | same | same, planner persona with tools |
 | GET | `/api/v1/recommendations/movie` | `type`, `year` (4 digits), `lang` | `{"answer","model"}` |
-| POST | `/api/v1/images` | `{"prompt": "..."}` | `{"id","totalTokens"}` |
-| GET | `/api/v1/images/{id}` | UUID | `image/png` |
+| POST | `/api/v1/images` | `{"prompt": "..."}` | `{"id","totalTokens"}`; owned by the authenticated caller |
+| GET | `/api/v1/images/{id}` | UUID | `image/png` for its owner; 404 for missing or other callers' images |
 | POST | `/api/v1/images/descriptions` | multipart `prompt`, `file` (jpeg/png/webp/gif) | `{"description"}` |
 | POST | `/api/v1/audio/transcriptions` | multipart `file` (mp3/wav/m4a/webm/ogg/flac), `targetLanguage` (default Telugu) | `{"transcript","translation","targetLanguage"}` |
 | POST | `/api/v1/audio/speech` | `{"text": "..."}` (max 4096) | `audio/mpeg` |
@@ -235,7 +235,7 @@ PowerShell: `$env:OPENAI_API_KEY="sk-..."`. The app listens on `http://localhost
 ./mvnw verify
 ```
 
-36 tests, no network and no API key required:
+44 tests, no external network and no API key required (image-ownership integration tests start a local HTTP server):
 
 | Kind | What it proves |
 |---|---|
@@ -245,12 +245,19 @@ PowerShell: `$env:OPENAI_API_KEY="sk-..."`. The app listens on `http://localhost
 | Advisor | Tutor instruction appended; roles and history preserved |
 | Tools (MockRestServiceServer) | URL encoding, key only in header, input rejection, graceful degradation |
 | Persistence (Testcontainers MySQL 8.4) | Memory round-trip on a real database; skipped automatically when Docker is unavailable |
+| Image ownership (real HTTP, security, service and disk; fake image provider) | Creator-only downloads in both directions, spoofed caller parameter ignored, consistent 404s, anonymous 401s, legacy-root files denied, ownership after service recreation, path-safe caller directories |
 
 CI (`.github/workflows/ci.yml`) runs `mvn verify` (including the MySQL test) and builds the Docker image.
 
 ---
 
 ## Production readiness
+
+### Generated image ownership and existing files
+
+Image generation and downloads use the authenticated principal, never a caller id supplied in the request. Files are stored at `${IMAGE_OUTPUT_DIR}/caller-<sha256>/<uuid>.png`, where `<sha256>` is the lowercase SHA-256 digest of the UTF-8 caller id. The directory name keeps caller ids out of filesystem paths; the authorization boundary is selecting that directory from the authenticated principal. Downloads never search other callers' directories. The same caller id continues to own its images across restarts and API-key changes.
+
+**Upgrade note:** images previously stored directly at `${IMAGE_OUTPUT_DIR}/<uuid>.png` have no recorded owner. They intentionally return 404 after this change, even to authenticated callers. There is no fallback to the shared directory and no automatic ownership assignment. Preserve or back up existing files; an operator may move an image into its verified owner's caller directory only when ownership can be established independently. Knowing an image UUID is not proof of ownership. Changing a caller id also changes its storage directory; plan an explicit ownership migration when renaming callers.
 
 | Area | Status |
 |---|---|
