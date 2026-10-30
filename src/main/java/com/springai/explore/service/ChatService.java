@@ -7,6 +7,10 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+
 import static com.springai.explore.config.AiConfig.MEMORY_CLIENT;
 import static com.springai.explore.config.AiConfig.PLAIN_CLIENT;
 import static com.springai.explore.config.AiConfig.TOOLS_CLIENT;
@@ -40,6 +44,7 @@ public class ChatService {
     private final ChatClient memory;
     private final ChatClient tutor;
     private final ChatClient tools;
+    private final Set<String> activeConversations = ConcurrentHashMap.newKeySet();
 
     public ChatService(@Qualifier(PLAIN_CLIENT) ChatClient plain,
                        @Qualifier(MEMORY_CLIENT) ChatClient memory,
@@ -64,13 +69,15 @@ public class ChatService {
     }
 
     public ChatReply planMyDay(String callerId, String prompt) {
-        ChatResponse response = tools.prompt()
-                .system(PLANNER_SYSTEM)
-                .user(prompt)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, callerId))
-                .call()
-                .chatResponse();
-        return toReply(response);
+        return inConversation(callerId, () -> {
+            ChatResponse response = tools.prompt()
+                    .system(PLANNER_SYSTEM)
+                    .user(prompt)
+                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, callerId))
+                    .call()
+                    .chatResponse();
+            return toReply(response);
+        });
     }
 
     /** Stateless: a recommendation does not need (or pollute) a conversation. */
@@ -83,12 +90,26 @@ public class ChatService {
     }
 
     private ChatReply converse(ChatClient client, String callerId, String prompt) {
-        ChatResponse response = client.prompt()
-                .user(prompt)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, callerId))
-                .call()
-                .chatResponse();
-        return toReply(response);
+        return inConversation(callerId, () -> {
+            ChatResponse response = client.prompt()
+                    .user(prompt)
+                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, callerId))
+                    .call()
+                    .chatResponse();
+            return toReply(response);
+        });
+    }
+
+    /** One complete memory/model turn per caller in this application instance, with no waiting queue. */
+    private ChatReply inConversation(String callerId, Supplier<ChatReply> turn) {
+        if (!activeConversations.add(callerId)) {
+            throw new ConversationBusyException();
+        }
+        try {
+            return turn.get();
+        } finally {
+            activeConversations.remove(callerId);
+        }
     }
 
     private static ChatReply toReply(ChatResponse response) {
