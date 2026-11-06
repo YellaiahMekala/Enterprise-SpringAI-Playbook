@@ -2,6 +2,16 @@
 
 [![CI](https://github.com/YellaiahMekala/Enterprise-SpringAI-Playbook/actions/workflows/ci.yml/badge.svg)](https://github.com/YellaiahMekala/Enterprise-SpringAI-Playbook/actions/workflows/ci.yml)
 
+[![Java 21](https://img.shields.io/badge/Java-21-437291?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Spring AI 2.0](https://img.shields.io/badge/Spring%20AI-2.0-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-ai)
+[![MySQL 8](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![JUnit 5](https://img.shields.io/badge/JUnit-5-25A162?logo=junit5&logoColor=white)](https://junit.org/junit5/)
+[![Mockito](https://img.shields.io/badge/Mockito-Testing-78A641)](https://site.mockito.org/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Maven](https://img.shields.io/badge/Maven-Build-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-CI-2088FF?logo=githubactions&logoColor=white)](https://github.com/features/actions)
+
 CI is currently green on the default branch.
 
 Production-minded patterns for enterprise LLM backends on **Spring AI 2.0**, **Spring Boot 4** and **Java 21**: tool calling, durable chat memory, custom advisors, multimodal (image and audio), API-key security, validated REST contracts and a test suite that runs without an API key.
