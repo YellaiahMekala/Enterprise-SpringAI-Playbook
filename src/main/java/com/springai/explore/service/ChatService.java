@@ -6,6 +6,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import static com.springai.explore.config.AiConfig.MEMORY_CLIENT;
 import static com.springai.explore.config.AiConfig.PLAIN_CLIENT;
@@ -92,7 +93,8 @@ public class ChatService {
     }
 
     private static ChatReply toReply(ChatResponse response) {
-        if (response == null || response.getResult() == null || response.getResult().getOutput().getText() == null) {
+        if (response == null || response.getResult() == null
+                || !StringUtils.hasText(response.getResult().getOutput().getText())) {
             throw new ModelResponseException("The model returned an empty response.");
         }
         return new ChatReply(response.getResult().getOutput().getText(), response.getMetadata().getModel());

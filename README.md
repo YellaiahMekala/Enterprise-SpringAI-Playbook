@@ -235,13 +235,13 @@ PowerShell: `$env:OPENAI_API_KEY="sk-..."`. The app listens on `http://localhost
 ./mvnw verify
 ```
 
-36 tests, no network and no API key required:
+56 tests, no network and no API key required:
 
 | Kind | What it proves |
 |---|---|
 | Security filter | Digest-based key match, startup fail-fast on missing/blank/oversized ids |
 | Web (MockMvc, full filter chain) | 401 contract, public health only, validation 400s, upload 400/415, UUID path checks, 502 mapping, no internal leak on 500 |
-| Chat service with the real `ChatClient` and memory advisor against a fake model | History replay per caller, isolation between callers, empty-response handling |
+| Chat service with the real `ChatClient` and memory advisor against a fake model | History replay per caller, isolation between callers, empty-response handling; empty and whitespace-only answers rejected across all five chat operations, valid answer formatting preserved |
 | Advisor | Tutor instruction appended; roles and history preserved |
 | Tools (MockRestServiceServer) | URL encoding, key only in header, input rejection, graceful degradation |
 | Persistence (Testcontainers MySQL 8.4) | Memory round-trip on a real database; skipped automatically when Docker is unavailable |
